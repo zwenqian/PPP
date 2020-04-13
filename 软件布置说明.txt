@@ -1,0 +1,95 @@
+Ubuntu中实现ppp拨号连接
+以SIM7600 3G/4G模块、联通sim卡为例实现ppp拨号连接，具体过程如下：
+1）安装pppd拨号软件，下载源码ppp-2.4.5.tar.gz，编译并安装（如是嵌入式环境，需交叉编译），编译及安装命令如下：
+./configure
+make 
+make install
+2）编辑和配置脚本/etc/ppp/peers/gprs-dial和/etc/chatscripts/gprs-chat；
+/etc/ppp/peers/gprs-dial内容如下：
+#/etc/ppp/peers/gprs-dial
+hide-password
+noauth
+connect "/usr/local/sbin/chat -v -s -f /etc/chatscripts/gprs-chat"
+ 
+debug
+/dev/ttyUSB2   #ppp拨号串口；
+115200   #串口波特率；
+crtscts
+modem
+defaultroute
+noipdefault
+local
+lock
+dump
+nodetach
+user " "
+remotename unicom
+ipparam unicom
+usepeerdns
+
+/etc/chatscripts/gprs-chat内容如下：
+# You can use this script unmodified to connect to cellular networks.
+# The APN is specified in the peers file as the argument of the -T command
+# line option of chat(8).
+
+# For details about the AT commands involved please consult the relevant
+# standard: 3GPP TS 27.007 - AT command set for User Equipment (UE).
+# (http://www.3gpp.org/ftp/Specs/html-info/27007.htm)
+
+ABORT		"BUSY"
+ABORT		"VOICE"
+ABORT		"NO CARRIER"
+ABORT		"NO DIALTONE"
+ABORT		"NO DIAL TONE"
+ABORT		"NO ANSWER"
+ABORT		"DELAYED"
+ABORT		"ERROR"
+
+# cease if the modem is not attached to the network yet
+ABORT		"+CGATT: 0"
+
+""		AT
+TIMEOUT		12
+OK		ATH
+OK		ATE1
+
+# +CPIN provides the SIM card PIN
+#OK		"AT+CPIN=1234"
+
+# +CFUN may allow to configure the handset to limit operations to
+# GPRS/EDGE/UMTS/etc to save power, but the arguments are not standard
+# except for 1 which means "full functionality".
+#OK		AT+CFUN=1
+
+#OK		AT+CGDCONT=1,"IP","\T","",0,0
+OK		AT+CGDCONT=1,"IP","3GNET"        #联通卡的初始化指令，移动是CMNET；
+OK		ATDT*99#    #联通卡的拨号指令；
+TIMEOUT		22
+CONNECT		""
+3）运行拨号命令，如下：
+sudo /usr/sbin/pppd call gprs-dial &
+
+交叉编译ppp-2.4.5，实现ppp拨号连接，采用sim7600模块
+1）安装pppd拨号软件，下载源码ppp-2.4.5.tar.gz，交叉编译（但是安装会出错），编译命令如下：
+./configure
+make  CC=arm-xilinx-linux-gnueabi-gcc
+2) 将编译好的文件拷贝到目标板的/usr/sbin中，具体文件有：
+pppd、chat、pppdump、pppstats
+3) 在目标板中新建文件夹/etc/ppp、/etc/ppp/peers、/var/lock，将编译好的文件拷贝到目标板中：
+/etc/ppp中放入chap-secrets、options、pap-secrets、resolv.conf、gprs-3gnet-chat(移动卡)、gprs-cmnet-chat(联通)；
+/etc/ppp/peers中放入gprs-3gnet-dial（移动卡）、gprs-cmnet-dial（联通卡）；
+4) 运行拨号命令，如下：
+pppd call gprs-3gnet-dial （移动卡）
+pppd call gprs-cmnet-dial（联通卡）
+
+用pptp客户端连接VPN
+1) 下载编译pptp-1.7.2，编译命令；
+make CC=arm-linux-gnueabihf-gcc
+2) 将编译好的pptp放到目标板的/usr/sbin目录下；
+注意：在此之前需移植好pppd环境;
+在/etc/ppp/peers目录下生成拨号脚本pptp0，内容如下：
+pty "pptp 47.92.97.83 --nolaunchpppd"
+name haige1
+password 123456
+require-mppe-128
+运行命令为：pppd call pptp0

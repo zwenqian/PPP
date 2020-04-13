@@ -1,0 +1,19 @@
+hide-password
+noauth
+connect "/usr/sbin/chat -v -s -f /etc/ppp/gprs-3gnet-chat"
+ 
+debug
+/dev/ttyUSB3
+115200
+crtscts
+modem
+defaultroute
+noipdefault
+local
+lock
+dump
+nodetach
+user " "
+remotename unicom
+ipparam unicom
+usepeerdns
